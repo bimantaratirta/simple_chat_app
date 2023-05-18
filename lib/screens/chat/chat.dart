@@ -1,8 +1,9 @@
-import 'dart:math';
-
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:socket_io_client/socket_io_client.dart';
+import 'package:intl/intl.dart';
+
+import '../../model/chat_model.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -17,9 +18,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
   double scrollPosition = 0.0;
   bool isScrolled = false;
-  List<Map<String, dynamic>> listChat = [];
+  List<ChatModel> listChat = [];
   Socket socket = io(
-    'ws://localhost:3000',
+    'ws://localhost:1233',
     OptionBuilder().setTransports(['websocket']).disableAutoConnect().build(),
   );
 
@@ -32,7 +33,18 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void connect() {
     socket.connect();
-    socket.on("sendMsgServer", (data) => print("${socket.id!}: $data"));
+    socket.on("sendMsgServer", (chat) {
+      setState(() {
+        listChat.add(ChatModel.fromJson(chat));
+      });
+    });
+  }
+
+  String dateParser(String sentAt) {
+    final DateTime date = DateTime.parse(sentAt);
+    final DateFormat timeFormatter = DateFormat.Hm();
+    final String formatted = timeFormatter.format(date.toLocal());
+    return formatted;
   }
 
   @override
@@ -65,11 +77,12 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     final Size size = MediaQuery.of(context).size;
+    const SizedBox xtraSmallVerticalGap = SizedBox(height: 4);
     return Scaffold(
       backgroundColor: Colors.grey.shade100,
       appBar: AppBar(
         elevation: 0,
-        title: const Text("Chat App"),
+        title: const Text("Group Chat"),
       ),
       body: Column(
         children: [
@@ -87,7 +100,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     children: [
                       const SizedBox(height: 24),
                       for (var chat in listChat) ...[
-                        if (chat['sender'] != socket.id) ...[
+                        if (chat.sender == socket.id) ...[
                           Align(
                             alignment: Alignment.centerRight,
                             child: Column(
@@ -99,8 +112,8 @@ class _ChatScreenState extends State<ChatScreen> {
                                     maxWidth: size.width / 1.5,
                                   ),
                                   padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 8,
+                                    horizontal: 12,
+                                    vertical: 6,
                                   ),
                                   decoration: BoxDecoration(
                                     color: Colors.pink.shade200,
@@ -112,18 +125,23 @@ class _ChatScreenState extends State<ChatScreen> {
                                     ),
                                   ),
                                   child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
                                     children: [
                                       Text(
-                                        chat['message'],
-                                        style: TextStyle(color: Colors.white),
+                                        "${chat.message}",
+                                        style: const TextStyle(
+                                            color: Colors.white),
+                                      ),
+                                      xtraSmallVerticalGap,
+                                      Text(
+                                        dateParser(chat.sentAt!),
+                                        style: const TextStyle(
+                                          fontSize: 9,
+                                          color: Colors.white,
+                                        ),
                                       ),
                                     ],
                                   ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  chat['sent_at'],
-                                  style: TextStyle(fontSize: 9),
                                 ),
                               ],
                             ),
@@ -140,8 +158,8 @@ class _ChatScreenState extends State<ChatScreen> {
                                     maxWidth: size.width / 1.5,
                                   ),
                                   padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 8,
+                                    horizontal: 12,
+                                    vertical: 6,
                                   ),
                                   decoration: BoxDecoration(
                                     borderRadius: const BorderRadius.only(
@@ -153,20 +171,24 @@ class _ChatScreenState extends State<ChatScreen> {
                                     border:
                                         Border.all(color: Colors.grey.shade300),
                                   ),
-                                  child: Text(chat['message']),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  chat['sent_at'],
-                                  style: TextStyle(fontSize: 9),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text("${chat.message}"),
+                                      xtraSmallVerticalGap,
+                                      Text(
+                                        dateParser(chat.sentAt!),
+                                        style: const TextStyle(fontSize: 9),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ],
                             ),
                           ),
                         ],
-                        const SizedBox(
-                          height: 4,
-                        ),
+                        xtraSmallVerticalGap,
                       ],
                     ],
                   ),
@@ -181,7 +203,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: Colors.pink.shade100,
+                          color: Colors.pink.shade100.withOpacity(.5),
                         ),
                         child: Transform.rotate(
                           angle: 1.6,
@@ -238,16 +260,16 @@ class _ChatScreenState extends State<ChatScreen> {
                 TextButton(
                   onPressed: () {
                     if (textEditingController.text != "") {
-                      final Map<String, dynamic> chat = {
-                        "message": textEditingController.text,
-                        "time": DateTime.now().toLocal().toString()
-                      };
-                      socket.emit("sendMsg", textEditingController.text);
+                      final ChatModel chat = ChatModel(
+                          sender: socket.id,
+                          message: textEditingController.text,
+                          sentAt: DateTime.now().toLocal().toIso8601String());
+                      socket.emit("sendMsg", chat.toJson());
                       scrollDown();
                       textEditingController.clear();
                     }
                   },
-                  child: Text("Kirim"),
+                  child: const Icon(Icons.send_rounded),
                 )
               ],
             ),
