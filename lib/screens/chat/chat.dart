@@ -1,5 +1,8 @@
+import 'dart:developer';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:socket_io_client/socket_io_client.dart';
 import 'package:intl/intl.dart';
 
@@ -37,6 +40,16 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() {
         listChat.add(ChatModel.fromJson(chat));
       });
+    });
+    socket.on("nego", (amount) {
+      log(amount['sender']);
+      if (amount["sender"] != socket.id) {
+        final snackbar = GetSnackBar(
+          title: "Nego",
+          message: "Amount: ${amount['amount']}",
+        );
+        Get.showSnackbar(snackbar);
+      }
     });
   }
 
@@ -270,7 +283,21 @@ class _ChatScreenState extends State<ChatScreen> {
                     }
                   },
                   child: const Icon(Icons.send_rounded),
-                )
+                ),
+                TextButton(
+                  onPressed: () {
+                    print("send");
+                    if (textEditingController.text != "") {
+                      final nego = {
+                        "sender": socket.id,
+                        "amount": textEditingController.text,
+                      };
+                      socket.emit("negotiate", nego);
+                      textEditingController.clear();
+                    }
+                  },
+                  child: Text("nego"),
+                ),
               ],
             ),
           )

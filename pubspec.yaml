@@ -38,6 +38,8 @@ dependencies:
   socket_io_client: ^2.0.2
   web_socket_channel: ^2.4.0
   intl: ^0.18.1
+  http: ^0.13.6
+  get: ^4.6.5
 
 dev_dependencies:
   flutter_test:
