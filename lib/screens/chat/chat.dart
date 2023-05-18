@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:socket_io_client/socket_io_client.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -17,11 +18,27 @@ class _ChatScreenState extends State<ChatScreen> {
   double scrollPosition = 0.0;
   bool isScrolled = false;
   List<Map<String, dynamic>> listChat = [];
+  Socket socket = io(
+    'ws://localhost:3000',
+    OptionBuilder().setTransports(['websocket']).disableAutoConnect().build(),
+  );
 
   @override
   void initState() {
     scrollController.addListener(scrollListenter);
+    connect();
     super.initState();
+  }
+
+  void connect() {
+    socket.connect();
+    socket.on("sendMsgServer", (data) => print("${socket.id!}: $data"));
+  }
+
+  @override
+  void dispose() {
+    socket.disconnect();
+    super.dispose();
   }
 
   void scrollDown() {
@@ -70,7 +87,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     children: [
                       const SizedBox(height: 24),
                       for (var chat in listChat) ...[
-                        if (chat['sender'] == "0") ...[
+                        if (chat['sender'] != socket.id) ...[
                           Align(
                             alignment: Alignment.centerRight,
                             child: Column(
@@ -105,7 +122,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  '11:23',
+                                  chat['sent_at'],
                                   style: TextStyle(fontSize: 9),
                                 ),
                               ],
@@ -140,7 +157,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  '11:23',
+                                  chat['sent_at'],
                                   style: TextStyle(fontSize: 9),
                                 ),
                               ],
@@ -220,18 +237,15 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
                 TextButton(
                   onPressed: () {
-                    final Map<String, dynamic> chat = {
-                      "message": textEditingController.text,
-                      "sender": Random().nextInt(2).toString(),
-                      "time": DateTime.now().toLocal().toString()
-                    };
                     if (textEditingController.text != "") {
-                      setState(() {
-                        listChat.add(chat);
-                      });
+                      final Map<String, dynamic> chat = {
+                        "message": textEditingController.text,
+                        "time": DateTime.now().toLocal().toString()
+                      };
+                      socket.emit("sendMsg", textEditingController.text);
+                      scrollDown();
+                      textEditingController.clear();
                     }
-                    scrollDown();
-                    textEditingController.clear();
                   },
                   child: Text("Kirim"),
                 )
